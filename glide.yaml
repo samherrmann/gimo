@@ -1,0 +1,6 @@
+package: github.com/samherrmann/gimo
+import:
+- package: github.com/go-mgo/mgo
+  version: r2016.02.04
+- package: github.com/gin-gonic/gin
+  version: 5caaac4c5c712a9e7a7de29e6c24ef46c753017f
