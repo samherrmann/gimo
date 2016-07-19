@@ -42,6 +42,11 @@ type (
 	}
 )
 
+// Default returns a Library object with default internal settings.
+func Default(baseGroup *gin.RouterGroup, dbInfo *mgo.DialInfo) *Library {
+	return New(baseGroup, dbInfo, DefaultRequestCtxKey, DefaultResponseCtxKey)
+}
+
 // New returns a Library object.
 func New(baseGroup *gin.RouterGroup, dbInfo *mgo.DialInfo, requestCtxKey string, responseCtxKey string) *Library {
 	if requestCtxKey == "" {

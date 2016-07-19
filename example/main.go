@@ -23,10 +23,10 @@ func main() {
 	info.Timeout = 2 * time.Second
 
 	// Create a new gimo library
-	lib := gimo.New(group, info, gimo.DefaultRequestCtxKey, gimo.DefaultResponseCtxKey)
+	lib := gimo.Default(group, info)
 	defer lib.Terminate()
 
-	// Gimo's "New" function above dialed the mongoDB server/cluster and established
+	// Gimo's "Default" function above dialed the mongoDB server/cluster and established
 	// a session. You have access to the establisehd session and can make changes
 	// as you wish...
 	lib.Session.SetMode(mgo.Monotonic, true)
