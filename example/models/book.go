@@ -9,10 +9,10 @@ type Book struct {
 	Publisher         string `json:"publisher"`
 }
 
-func (p *Book) New() gimo.Document {
+func (b *Book) New() gimo.Document {
 	return &Book{}
 }
 
-func (p *Book) Slice() interface{} {
+func (b *Book) Slice() interface{} {
 	return &[]Book{}
 }
