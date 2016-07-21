@@ -34,10 +34,10 @@ func main() {
 	// Add a "books" resource with all actions enabled
 	res := lib.Resource("books", &models.Book{})
 	res.Create( /* you can add middleware in here to handle your business logic */ )
-	res.List( /* middleware */ )
-	res.Get( /* middleware */ )
+	res.Read( /* middleware */ )
 	res.Update( /* middleware */ )
 	res.Delete( /* middleware */ )
+	res.List( /* middleware */ )
 
 	router.Run(":8080")
 }

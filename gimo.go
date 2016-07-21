@@ -103,32 +103,10 @@ func (r *Resource) Create(mw ...gin.HandlerFunc) {
 	r.Group.POST("/", chain...)
 }
 
-// List adds a Gin handler function that allows
-// one to get all documents from the mongoDB
-// collection.
-func (r *Resource) List(mw ...gin.HandlerFunc) {
-	h := func(ctx *gin.Context) {
-		c := r.Session.Clone().DB("").C(r.Name)
-		defer c.Database.Session.Close()
-
-		docs := r.Doc.Slice()
-		err := c.Find(nil).All(docs)
-		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, err)
-			return
-		}
-		ctx.Set(r.ResponseCtxKey, docs)
-	}
-
-	chain := append([]gin.HandlerFunc{r.json}, mw...)
-	chain = append(chain, h)
-	r.Group.GET("/", chain...)
-}
-
-// Get adds a Gin handler function that allows
+// Read adds a Gin handler function that allows
 // one to get a single document from the mongoDB
 // collection.
-func (r *Resource) Get(mw ...gin.HandlerFunc) {
+func (r *Resource) Read(mw ...gin.HandlerFunc) {
 	h := func(ctx *gin.Context) {
 		c := r.Session.Clone().DB("").C(r.Name)
 		defer c.Database.Session.Close()
@@ -202,6 +180,28 @@ func (r *Resource) Delete(mw ...gin.HandlerFunc) {
 	chain := append([]gin.HandlerFunc{r.json}, mw...)
 	chain = append(chain, h)
 	r.Group.DELETE("/:"+idPathParamKey, chain...)
+}
+
+// List adds a Gin handler function that allows
+// one to get all documents from the mongoDB
+// collection.
+func (r *Resource) List(mw ...gin.HandlerFunc) {
+	h := func(ctx *gin.Context) {
+		c := r.Session.Clone().DB("").C(r.Name)
+		defer c.Database.Session.Close()
+
+		docs := r.Doc.Slice()
+		err := c.Find(nil).All(docs)
+		if err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+		ctx.Set(r.ResponseCtxKey, docs)
+	}
+
+	chain := append([]gin.HandlerFunc{r.json}, mw...)
+	chain = append(chain, h)
+	r.Group.GET("/", chain...)
 }
 
 // binJSON is a Gin handler function that parses the JSON
