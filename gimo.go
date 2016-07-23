@@ -97,8 +97,8 @@ func (r *Resource) Create(mw ...gin.HandlerFunc) {
 		ctx.Set(r.ResponseCtxKey, doc)
 	}
 
-	chain := append([]gin.HandlerFunc{r.bindJSON}, mw...)
-	chain = append([]gin.HandlerFunc{r.json}, chain...)
+	chain := append([]gin.HandlerFunc{r.parseRequest}, mw...)
+	chain = append([]gin.HandlerFunc{r.serializeResponse}, chain...)
 	chain = append(chain, h)
 	r.Group.POST("/", chain...)
 }
@@ -124,7 +124,7 @@ func (r *Resource) Read(mw ...gin.HandlerFunc) {
 		ctx.Set(r.ResponseCtxKey, doc)
 	}
 
-	chain := append([]gin.HandlerFunc{r.json}, mw...)
+	chain := append([]gin.HandlerFunc{r.serializeResponse}, mw...)
 	chain = append(chain, h)
 	r.Group.GET("/:"+idPathParamKey, chain...)
 }
@@ -151,8 +151,8 @@ func (r *Resource) Update(mw ...gin.HandlerFunc) {
 		ctx.Set(r.ResponseCtxKey, doc)
 	}
 
-	chain := append([]gin.HandlerFunc{r.bindJSON}, mw...)
-	chain = append([]gin.HandlerFunc{r.json}, chain...)
+	chain := append([]gin.HandlerFunc{r.parseRequest}, mw...)
+	chain = append([]gin.HandlerFunc{r.serializeResponse}, chain...)
 	chain = append(chain, h)
 	r.Group.PUT("/:"+idPathParamKey, chain...)
 }
@@ -177,7 +177,7 @@ func (r *Resource) Delete(mw ...gin.HandlerFunc) {
 		ctx.Set(r.ResponseCtxKey, nil)
 	}
 
-	chain := append([]gin.HandlerFunc{r.json}, mw...)
+	chain := append([]gin.HandlerFunc{r.serializeResponse}, mw...)
 	chain = append(chain, h)
 	r.Group.DELETE("/:"+idPathParamKey, chain...)
 }
@@ -199,15 +199,15 @@ func (r *Resource) List(mw ...gin.HandlerFunc) {
 		ctx.Set(r.ResponseCtxKey, docs)
 	}
 
-	chain := append([]gin.HandlerFunc{r.json}, mw...)
+	chain := append([]gin.HandlerFunc{r.serializeResponse}, mw...)
 	chain = append(chain, h)
 	r.Group.GET("/", chain...)
 }
 
-// binJSON is a Gin handler function that parses the JSON
-// in the request body and stores the parsed result in the
-// Gin context.
-func (r *Resource) bindJSON(ctx *gin.Context) {
+// parseRequest is a Gin handler function that parses the
+// JSON in the request body and stores the parsed result
+// in the Gin context.
+func (r *Resource) parseRequest(ctx *gin.Context) {
 	doc := r.Doc.New()
 	err := ctx.BindJSON(doc)
 	if err != nil {
@@ -218,10 +218,10 @@ func (r *Resource) bindJSON(ctx *gin.Context) {
 	ctx.Next()
 }
 
-// json is a Gin handler function that serializes
-// the struct stored in the "response" Gin context
-// as JSON into the response body.
-func (r *Resource) json(ctx *gin.Context) {
+// serializeResponse is a Gin handler function that serializes
+// the struct stored in the "response" Gin context to JSON and
+// writes it to the response body.
+func (r *Resource) serializeResponse(ctx *gin.Context) {
 	ctx.Next()
 	doc, exists := ctx.Get(r.ResponseCtxKey)
 	if !exists || doc == nil {
