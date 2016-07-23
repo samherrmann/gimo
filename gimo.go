@@ -40,6 +40,13 @@ type (
 		Group *gin.RouterGroup
 		Doc   Document
 	}
+
+	// ErrorMeta is a matadata struct for a Gin Error
+	ErrorMeta struct {
+		// The suggested HTTP status code to return to
+		// the client for the error
+		Code int
+	}
 )
 
 // Default returns a Library instance with default internal settings.
@@ -66,12 +73,18 @@ func New(baseGroup *gin.RouterGroup, dbInfo *mgo.DialInfo, requestCtxKey string,
 
 // Resource returns a Resource instance.
 func (lib *Library) Resource(name string, doc Document) *Resource {
-	return &Resource{
+	group := lib.BaseGroup.Group(name)
+
+	r := &Resource{
 		Library: lib,
 		Name:    name,
-		Group:   lib.BaseGroup.Group(name),
+		Group:   group,
 		Doc:     doc,
 	}
+
+	group.Use(r.serializeResponse)
+	group.Use(r.handleErrors)
+	return r
 }
 
 // Terminate closes the mongoDB session.
@@ -91,14 +104,13 @@ func (r *Resource) Create(mw ...gin.HandlerFunc) {
 		doc.SetID(bson.NewObjectId().Hex())
 		err := c.Insert(doc)
 		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, err)
+			ctx.Error(err).SetType(gin.ErrorTypePrivate).SetMeta(&ErrorMeta{Code: http.StatusInternalServerError})
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, doc)
 	}
 
 	chain := append([]gin.HandlerFunc{r.parseRequest}, mw...)
-	chain = append([]gin.HandlerFunc{r.serializeResponse}, chain...)
 	chain = append(chain, h)
 	r.Group.POST("/", chain...)
 }
@@ -114,18 +126,17 @@ func (r *Resource) Read(mw ...gin.HandlerFunc) {
 		doc := r.Doc.New()
 		err := c.FindId(ctx.Param(idPathParamKey)).One(doc)
 		if err == mgo.ErrNotFound {
-			ctx.AbortWithStatus(http.StatusNotFound)
+			ctx.Error(err).SetType(gin.ErrorTypePublic).SetMeta(&ErrorMeta{Code: http.StatusNotFound})
 			return
 		}
 		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, err)
+			ctx.Error(err).SetType(gin.ErrorTypePrivate).SetMeta(&ErrorMeta{Code: http.StatusInternalServerError})
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, doc)
 	}
 
-	chain := append([]gin.HandlerFunc{r.serializeResponse}, mw...)
-	chain = append(chain, h)
+	chain := append(mw, h)
 	r.Group.GET("/:"+idPathParamKey, chain...)
 }
 
@@ -141,18 +152,17 @@ func (r *Resource) Update(mw ...gin.HandlerFunc) {
 		doc.SetID(ctx.Param(idPathParamKey))
 		err := c.UpdateId(doc.GetID(), bson.M{"$set": doc})
 		if err == mgo.ErrNotFound {
-			ctx.AbortWithStatus(http.StatusNotFound)
+			ctx.Error(err).SetType(gin.ErrorTypePublic).SetMeta(&ErrorMeta{Code: http.StatusNotFound})
 			return
 		}
 		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, err)
+			ctx.Error(err).SetType(gin.ErrorTypePrivate).SetMeta(&ErrorMeta{Code: http.StatusInternalServerError})
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, doc)
 	}
 
 	chain := append([]gin.HandlerFunc{r.parseRequest}, mw...)
-	chain = append([]gin.HandlerFunc{r.serializeResponse}, chain...)
 	chain = append(chain, h)
 	r.Group.PUT("/:"+idPathParamKey, chain...)
 }
@@ -167,18 +177,17 @@ func (r *Resource) Delete(mw ...gin.HandlerFunc) {
 
 		err := c.RemoveId(ctx.Param(idPathParamKey))
 		if err == mgo.ErrNotFound {
-			ctx.AbortWithStatus(http.StatusNotFound)
+			ctx.Error(err).SetType(gin.ErrorTypePublic).SetMeta(&ErrorMeta{Code: http.StatusNotFound})
 			return
 		}
 		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, err)
+			ctx.Error(err).SetType(gin.ErrorTypePrivate).SetMeta(&ErrorMeta{Code: http.StatusInternalServerError})
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, nil)
 	}
 
-	chain := append([]gin.HandlerFunc{r.serializeResponse}, mw...)
-	chain = append(chain, h)
+	chain := append(mw, h)
 	r.Group.DELETE("/:"+idPathParamKey, chain...)
 }
 
@@ -193,14 +202,13 @@ func (r *Resource) List(mw ...gin.HandlerFunc) {
 		docs := r.Doc.Slice()
 		err := c.Find(nil).All(docs)
 		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, err)
+			ctx.Error(err).SetType(gin.ErrorTypePrivate).SetMeta(&ErrorMeta{Code: http.StatusInternalServerError})
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, docs)
 	}
 
-	chain := append([]gin.HandlerFunc{r.serializeResponse}, mw...)
-	chain = append(chain, h)
+	chain := append(mw, h)
 	r.Group.GET("/", chain...)
 }
 
@@ -223,10 +231,34 @@ func (r *Resource) parseRequest(ctx *gin.Context) {
 // writes it to the response body.
 func (r *Resource) serializeResponse(ctx *gin.Context) {
 	ctx.Next()
+
+	if ErrorsExist(ctx) {
+		return
+	}
+
 	doc, exists := ctx.Get(r.ResponseCtxKey)
 	if !exists || doc == nil {
 		ctx.Status(http.StatusNoContent)
 		return
 	}
 	ctx.JSON(http.StatusOK, doc)
+}
+
+// handleErrors checks if any errors have occured in the chain.
+// If an error has occured, it writes the error to the HTTP
+// response and aborts the handler chain.
+func (r *Resource) handleErrors(ctx *gin.Context) {
+	ctx.Next()
+
+	if !ErrorsExist(ctx) {
+		return
+	}
+
+	lastCtxErr := ctx.Errors.Last()
+	errMsg := "An internal error occured"
+	if lastCtxErr.IsType(gin.ErrorTypePublic) {
+		errMsg = lastCtxErr.Err.Error()
+	}
+
+	ctx.String(getCtxErrorCode(lastCtxErr), "%v", errMsg)
 }
