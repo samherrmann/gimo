@@ -1,3 +1,4 @@
+// Package gimo is a Go library to build CRUD APIs with Gin and mgo.
 package gimo
 
 import (
@@ -19,13 +20,13 @@ const (
 	// can be customized with the "New"" function.
 	DefaultResponseCtxKey = "response"
 
-	// The path parameter key for the object's ID.
+	// The path parameter key for a resource ID.
 	idPathParamKey = "id"
 )
 
 type (
-	// Library represents the base object from which
-	// all resources are derived.
+	// Library is Gimo's core instance. It contains settings
+	// that are common to all resources.
 	Library struct {
 		BaseGroup      *gin.RouterGroup
 		Session        *mgo.Session
@@ -42,12 +43,12 @@ type (
 	}
 )
 
-// Default returns a Library object with default internal settings.
+// Default returns a Library instance with default internal settings.
 func Default(baseGroup *gin.RouterGroup, dbInfo *mgo.DialInfo) *Library {
 	return New(baseGroup, dbInfo, DefaultRequestCtxKey, DefaultResponseCtxKey)
 }
 
-// New returns a Library object.
+// New returns a Library instance.
 func New(baseGroup *gin.RouterGroup, dbInfo *mgo.DialInfo, requestCtxKey string, responseCtxKey string) *Library {
 	if requestCtxKey == "" {
 		requestCtxKey = DefaultRequestCtxKey
@@ -64,7 +65,7 @@ func New(baseGroup *gin.RouterGroup, dbInfo *mgo.DialInfo, requestCtxKey string,
 	}
 }
 
-// Resource returns a Resource object.
+// Resource returns a Resource instance.
 func (lib *Library) Resource(name string, doc Document) *Resource {
 	return &Resource{
 		Library: lib,
@@ -80,7 +81,7 @@ func (lib *Library) Terminate() {
 }
 
 // Create adds a Gin handler function that allows
-// one to create a new document in the mongoDB
+// a client to create a new document in the mongoDB
 // collection.
 func (r *Resource) Create(mw ...gin.HandlerFunc) {
 	h := func(ctx *gin.Context) {
@@ -104,8 +105,8 @@ func (r *Resource) Create(mw ...gin.HandlerFunc) {
 }
 
 // Read adds a Gin handler function that allows
-// one to get a single document from the mongoDB
-// collection.
+// a client to get a single document from the
+// mongoDB collection.
 func (r *Resource) Read(mw ...gin.HandlerFunc) {
 	h := func(ctx *gin.Context) {
 		c := r.Session.Clone().DB("").C(r.Name)
@@ -130,8 +131,8 @@ func (r *Resource) Read(mw ...gin.HandlerFunc) {
 }
 
 // Update adds a Gin handler function that allows
-// one to update an existing document in the mongoDB
-// collection.
+// a client to update an existing document in the
+// mongoDB collection.
 func (r *Resource) Update(mw ...gin.HandlerFunc) {
 	h := func(ctx *gin.Context) {
 		c := r.Session.Clone().DB("").C(r.Name)
@@ -158,7 +159,7 @@ func (r *Resource) Update(mw ...gin.HandlerFunc) {
 }
 
 // Delete adds a Gin handler function that allows
-// one to remove a document from the mongoDB
+// a client to remove a document from the mongoDB
 // collection.
 func (r *Resource) Delete(mw ...gin.HandlerFunc) {
 	h := func(ctx *gin.Context) {
@@ -183,7 +184,7 @@ func (r *Resource) Delete(mw ...gin.HandlerFunc) {
 }
 
 // List adds a Gin handler function that allows
-// one to get all documents from the mongoDB
+// a client to get all documents from the mongoDB
 // collection.
 func (r *Resource) List(mw ...gin.HandlerFunc) {
 	h := func(ctx *gin.Context) {
