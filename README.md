@@ -1,24 +1,21 @@
 # Gimo
-A Go library to build CRUD APIs with [Gin](https://github.com/gin-gonic/gin) and [mgo](https://github.com/go-mgo/mgo/tree/v2).
-
-[Gimo GoDoc](https://godoc.org/github.com/samherrmann/gimo)
+A Go library to build CRUD APIs with [Gin](https://github.com/gin-gonic/gin) and [mgo](https://github.com/go-mgo/mgo/tree/v2) (mongoDB).
 
 <span style="color: red">This project is a work in progress!</span>
 
-## What problem is Gimo solving?
-Not having to write separate endpoint handlers for every resource. For common use cases, it should be possible to break down the process of adding a resource into the following steps:
+[API Documentation](https://godoc.org/github.com/samherrmann/gimo)
 
-1. Define the resource's data model
-2. Define the resource's name (to generate the resource's URL(s) and its database collection)
-3. Define the supported actions, i.e. Create, read, update, delete, and list
-4. (If required) Define the middleware to handle specific business logic
+## Features
+* Add basic CRUD resources to your app quickly without the need to write any handler functions.
+* Add business logic with middleware.
+* Gin and mgo instances used by Gimo are accessible outside of Gimo, allowing you to handle edge cases that fall outside of Gimo's capabilities.
+* Gimo does not use reflection.
 
-A developer should not have to write endpoint handlers for every resource that moves data in and out of the database.
-
-## Gimo design goals
-* To not hide Gin or mgo underneath Gimo's hood. This allows you, the developer, to not be locked into yet another library. You have the ability to use Gimo where you see fit and cover edge cases that fall outside of Gimo's capabilities by just using Gin and mgo.
-* To not use reflection
-* To allow you to handle business logic with middleware
+## Steps to add a resource
+1. Define the resource's data model.
+2. Give your resource a name. The name is used to generate the resource's URL(s) and its database collection name.
+3. Declare which actions are supported on your resource, i.e. Create, read, update, delete, and list.
+4. (If required) Add middleware to handle specific business logic.
 
 ## Installation
 ```sh
@@ -26,6 +23,8 @@ go get github.com/samherrmann/gimo
 ```
 
 ## Example
+
+This example assumes that you are familiar with Gin and mgo.
 
 ```go
 func main() {
@@ -35,7 +34,7 @@ func main() {
 
     // Define the mgo dial info.
     info := &mgo.DialInfo{}
-    info.Addrs = []string{"localhost:27017"}
+    info.Addrs = []string{"127.0.0.1"}
     info.Database = "my-store"
     info.Timeout = 2 * time.Second
 
@@ -45,6 +44,7 @@ func main() {
     defer lib.Terminate()
 
     // Add a "books" resource with all actions enabled.
+    // The book data model is defined below.
     res := lib.Resource("books", &models.Book{})
     res.Create()
     res.Read()
@@ -56,7 +56,7 @@ func main() {
     router.Run(":8080")
 }
 
-// Define the data model for the book resource.
+// Define the book data model.
 // The data model struct must implement Gimo's
 // Document interface, i.e. it must contain a 
 // "SetID", "GetID", "New", and "Slice" method.
@@ -78,18 +78,12 @@ func (b *Book) Slice() interface{} {
 }
 ```
 
-In this example, Gimo performed the following two functions:
+The endpoints that Gimo created in this example are as follows:
 
-1. It created the following paths:
-
-    ```
     Create:     POST    /v1/books
     Read:       GET     /v1/books/:id
     Update:     PUT     /v1/books/:id
     Delete:     DELETE  /v1/books/:id
     List:       GET     /v1/books
-    ```
 
-2. It attached handler functions that handle the data flow between the HTTP requests and the database.
-
-Note: Gimo used the name `books` to generate the paths, but it also used it as the mongoDB collection name.
+This example demonstrated how to add a CRUD resource without having to write a single Gin handler function to interact with mongoDB.
