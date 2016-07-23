@@ -1,5 +1,5 @@
 # Gimo
-A Go helper library to build CRUD APIs with [Gin](https://github.com/gin-gonic/gin) and [mgo](https://github.com/go-mgo/mgo/tree/v2).
+A Go library to build CRUD APIs with [Gin](https://github.com/gin-gonic/gin) and [mgo](https://github.com/go-mgo/mgo/tree/v2).
 
 [Gimo GoDoc](https://godoc.org/github.com/samherrmann/gimo)
 
