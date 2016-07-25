@@ -82,8 +82,8 @@ func (lib *Library) Resource(name string, doc Document) *Resource {
 		Doc:     doc,
 	}
 
-	group.Use(r.serializeResponse)
 	group.Use(r.handleErrors)
+	group.Use(r.serializeResponse)
 	return r
 }
 
