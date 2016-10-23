@@ -246,7 +246,7 @@ func (r *Resource) serializeResponse(ctx *gin.Context) {
 
 // handleErrors checks if any errors have occured in the chain.
 // If an error has occured, it writes the error to the HTTP
-// response and aborts the handler chain.
+// response.
 func (r *Resource) handleErrors(ctx *gin.Context) {
 	ctx.Next()
 
