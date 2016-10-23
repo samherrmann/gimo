@@ -104,7 +104,7 @@ func (r *Resource) Create(mw ...gin.HandlerFunc) {
 		doc.SetID(bson.NewObjectId().Hex())
 		err := c.Insert(doc)
 		if err != nil {
-			ctx.Error(err).SetType(gin.ErrorTypePrivate).SetMeta(&ErrorMeta{Code: http.StatusInternalServerError})
+			AbortWithError(ctx, err, http.StatusInternalServerError)
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, doc)
@@ -126,11 +126,11 @@ func (r *Resource) Read(mw ...gin.HandlerFunc) {
 		doc := r.Doc.New()
 		err := c.FindId(ctx.Param(idPathParamKey)).One(doc)
 		if err == mgo.ErrNotFound {
-			ctx.Error(err).SetType(gin.ErrorTypePublic).SetMeta(&ErrorMeta{Code: http.StatusNotFound})
+			AbortWithError(ctx, err, http.StatusNotFound)
 			return
 		}
 		if err != nil {
-			ctx.Error(err).SetType(gin.ErrorTypePrivate).SetMeta(&ErrorMeta{Code: http.StatusInternalServerError})
+			AbortWithError(ctx, err, http.StatusInternalServerError)
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, doc)
@@ -152,11 +152,11 @@ func (r *Resource) Update(mw ...gin.HandlerFunc) {
 		doc.SetID(ctx.Param(idPathParamKey))
 		err := c.UpdateId(doc.GetID(), bson.M{"$set": doc})
 		if err == mgo.ErrNotFound {
-			ctx.Error(err).SetType(gin.ErrorTypePublic).SetMeta(&ErrorMeta{Code: http.StatusNotFound})
+			AbortWithError(ctx, err, http.StatusNotFound)
 			return
 		}
 		if err != nil {
-			ctx.Error(err).SetType(gin.ErrorTypePrivate).SetMeta(&ErrorMeta{Code: http.StatusInternalServerError})
+			AbortWithError(ctx, err, http.StatusInternalServerError)
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, doc)
@@ -177,11 +177,11 @@ func (r *Resource) Delete(mw ...gin.HandlerFunc) {
 
 		err := c.RemoveId(ctx.Param(idPathParamKey))
 		if err == mgo.ErrNotFound {
-			ctx.Error(err).SetType(gin.ErrorTypePublic).SetMeta(&ErrorMeta{Code: http.StatusNotFound})
+			AbortWithError(ctx, err, http.StatusNotFound)
 			return
 		}
 		if err != nil {
-			ctx.Error(err).SetType(gin.ErrorTypePrivate).SetMeta(&ErrorMeta{Code: http.StatusInternalServerError})
+			AbortWithError(ctx, err, http.StatusInternalServerError)
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, nil)
@@ -202,7 +202,7 @@ func (r *Resource) List(mw ...gin.HandlerFunc) {
 		docs := r.Doc.Slice()
 		err := c.Find(nil).All(docs)
 		if err != nil {
-			ctx.Error(err).SetType(gin.ErrorTypePrivate).SetMeta(&ErrorMeta{Code: http.StatusInternalServerError})
+			AbortWithError(ctx, err, http.StatusInternalServerError)
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, docs)
@@ -219,7 +219,7 @@ func (r *Resource) parseRequest(ctx *gin.Context) {
 	doc := r.Doc.New()
 	err := ctx.BindJSON(doc)
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, err)
+		AbortWithError(ctx, err, http.StatusBadRequest)
 		return
 	}
 	ctx.Set(r.RequestCtxKey, doc)
@@ -254,11 +254,15 @@ func (r *Resource) handleErrors(ctx *gin.Context) {
 		return
 	}
 
-	lastCtxErr := ctx.Errors.Last()
-	errMsg := "An internal error occured"
-	if lastCtxErr.IsType(gin.ErrorTypePublic) {
-		errMsg = lastCtxErr.Err.Error()
-	}
+	ctxErr := ctx.Errors[0]
+	code := getCtxErrorCode(ctxErr)
+	errMsg := ctxErr.Err.Error()
 
-	ctx.String(getCtxErrorCode(lastCtxErr), "%v", errMsg)
+	if code == http.StatusInternalServerError {
+		// For internal server errors, return a generic
+		// error message. The real error message should
+		// be logged internally.
+		errMsg = "An unexpected internal error occured. Please try again."
+	}
+	ctx.String(code, "%v", errMsg)
 }
