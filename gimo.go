@@ -40,13 +40,6 @@ type (
 		Group *gin.RouterGroup
 		Doc   Document
 	}
-
-	// ErrorMeta is a matadata struct for a Gin Error
-	ErrorMeta struct {
-		// The suggested HTTP status code to return to
-		// the client for the error
-		Code int
-	}
 )
 
 // Default returns a Library instance with default internal settings.
@@ -104,7 +97,7 @@ func (r *Resource) Create(mw ...gin.HandlerFunc) {
 		doc.SetID(bson.NewObjectId().Hex())
 		err := c.Insert(doc)
 		if err != nil {
-			AbortWithError(ctx, err, http.StatusInternalServerError)
+			ctx.Error(err)
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, doc)
@@ -126,11 +119,11 @@ func (r *Resource) Read(mw ...gin.HandlerFunc) {
 		doc := r.Doc.New()
 		err := c.FindId(ctx.Param(idPathParamKey)).One(doc)
 		if err == mgo.ErrNotFound {
-			AbortWithError(ctx, err, http.StatusNotFound)
+			ctx.AbortWithError(http.StatusNotFound, err)
 			return
 		}
 		if err != nil {
-			AbortWithError(ctx, err, http.StatusInternalServerError)
+			ctx.Error(err)
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, doc)
@@ -152,11 +145,11 @@ func (r *Resource) Update(mw ...gin.HandlerFunc) {
 		doc.SetID(ctx.Param(idPathParamKey))
 		err := c.UpdateId(doc.GetID(), bson.M{"$set": doc})
 		if err == mgo.ErrNotFound {
-			AbortWithError(ctx, err, http.StatusNotFound)
+			ctx.AbortWithError(http.StatusNotFound, err)
 			return
 		}
 		if err != nil {
-			AbortWithError(ctx, err, http.StatusInternalServerError)
+			ctx.Error(err)
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, doc)
@@ -177,11 +170,11 @@ func (r *Resource) Delete(mw ...gin.HandlerFunc) {
 
 		err := c.RemoveId(ctx.Param(idPathParamKey))
 		if err == mgo.ErrNotFound {
-			AbortWithError(ctx, err, http.StatusNotFound)
+			ctx.AbortWithError(http.StatusNotFound, err)
 			return
 		}
 		if err != nil {
-			AbortWithError(ctx, err, http.StatusInternalServerError)
+			ctx.Error(err)
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, nil)
@@ -202,7 +195,7 @@ func (r *Resource) List(mw ...gin.HandlerFunc) {
 		docs := r.Doc.Slice()
 		err := c.Find(nil).All(docs)
 		if err != nil {
-			AbortWithError(ctx, err, http.StatusInternalServerError)
+			ctx.Error(err)
 			return
 		}
 		ctx.Set(r.ResponseCtxKey, docs)
@@ -219,7 +212,7 @@ func (r *Resource) parseRequest(ctx *gin.Context) {
 	doc := r.Doc.New()
 	err := ctx.BindJSON(doc)
 	if err != nil {
-		AbortWithError(ctx, err, http.StatusBadRequest)
+		ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 	ctx.Set(r.RequestCtxKey, doc)
@@ -232,7 +225,7 @@ func (r *Resource) parseRequest(ctx *gin.Context) {
 func (r *Resource) serializeResponse(ctx *gin.Context) {
 	ctx.Next()
 
-	if ErrorsExist(ctx) {
+	if len(ctx.Errors) > 0 {
 		return
 	}
 
@@ -244,25 +237,20 @@ func (r *Resource) serializeResponse(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, doc)
 }
 
-// handleErrors checks if any errors have occured in the chain.
-// If an error has occured, it writes the error to the HTTP
-// response.
+// handleErrors checks if any errors have occured in the request
+// chain. If an error has occured but no status code was written,
+// it writes a status code of 500 (Internal server error). Note that
+// all client errors should be handled in middleware/handlers by
+// calling Gin's 'AbortWithError' function.
 func (r *Resource) handleErrors(ctx *gin.Context) {
 	ctx.Next()
 
-	if !ErrorsExist(ctx) {
+	if len(ctx.Errors) == 0 {
 		return
 	}
 
-	ctxErr := ctx.Errors[0]
-	code := getCtxErrorCode(ctxErr)
-	errMsg := ctxErr.Err.Error()
-
-	if code == http.StatusInternalServerError {
-		// For internal server errors, return a generic
-		// error message. The real error message should
-		// be logged internally.
-		errMsg = "An unexpected internal error occured. Please try again."
+	if !ctx.Writer.Written() {
+		ctx.Status(http.StatusInternalServerError)
 	}
-	ctx.String(code, "%v", errMsg)
+	ctx.Writer.WriteString(http.StatusText(ctx.Writer.Status()))
 }
