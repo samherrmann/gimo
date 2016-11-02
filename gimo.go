@@ -238,10 +238,16 @@ func (r *Resource) serializeResponse(ctx *gin.Context) {
 }
 
 // handleErrors checks if any errors have occured in the request
-// chain. If an error has occured but no status code was written,
-// it writes a status code of 500 (Internal server error). Note that
-// all client errors should be handled in middleware/handlers by
-// calling Gin's 'AbortWithError' function.
+// chain. If an error has occured but no status code was written
+// to the response, it writes a status code of 500 (Internal server
+// error). Note that all client errors should be handled in
+// middleware by calling Gin's 'AbortWithError' function. Also, if
+// a middleware wishes to expose to the client the error message
+// that it passes to the 'AbortWithError' function, then Gin's
+// 'SetType(gin.ErrorTypePublic)' function should be called. It is
+// assumed that if 'AbortWithError' is called, that this is always
+// the first error in the list of possible error that may occur
+// within a request chain.
 func (r *Resource) handleErrors(ctx *gin.Context) {
 	ctx.Next()
 
@@ -252,5 +258,13 @@ func (r *Resource) handleErrors(ctx *gin.Context) {
 	if !ctx.Writer.Written() {
 		ctx.Status(http.StatusInternalServerError)
 	}
-	ctx.Writer.WriteString(http.StatusText(ctx.Writer.Status()))
+
+	var errMsg string
+	if ctx.Errors[0].Type == gin.ErrorTypePublic {
+		errMsg = ctx.Errors[0].Error()
+
+	} else {
+		errMsg = http.StatusText(ctx.Writer.Status())
+	}
+	ctx.Writer.WriteString(errMsg)
 }
